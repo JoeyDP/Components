@@ -14,7 +14,7 @@ setuptools.setup(
     description="Python library to facilitate modular components that can be combined through dependency injection.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pypa/sampleproject",
+    url="https://github.com/JoeyDP/Components",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
