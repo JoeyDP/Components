@@ -1,10 +1,10 @@
 import setuptools
-import sys
+import os
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-version = sys.environ.get("VERSION", "v0.0.1")
+version = os.environ.get("VERSION", "v0.0.1")
 
 setuptools.setup(
     name="components", # Replace with your own username
