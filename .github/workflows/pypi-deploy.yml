@@ -12,12 +12,15 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+          with:
+            python-version: 3.8
       - name: Create dist from setup.py
         env:
           VERSION: ${{ github.event.release.tag_name }}
         run: |
-          pwd
-          ls
           python setup.py sdist bdist_wheel
       - name: pypi-publish
         uses: pypa/gh-action-pypi-publish@v1.3.1
