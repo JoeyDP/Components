@@ -15,8 +15,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Set up Python
         uses: actions/setup-python@v2
-          with:
-            python-version: 3.8
+        with:
+          python-version: 3.8
       - name: Create dist from setup.py
         env:
           VERSION: ${{ github.event.release.tag_name }}
