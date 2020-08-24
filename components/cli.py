@@ -1,8 +1,8 @@
-from components import AttributeComponentResolver
+from components import ComponentResolver
 
 
 class CLI:
-    class Command(AttributeComponentResolver):
+    class Command(ComponentResolver):
         """ Resolves parameters from command line arguments. """
 
         # inherits from AttributeComponentResolver to ensure correct MRO.
