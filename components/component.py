@@ -13,6 +13,10 @@ class Component(object):
         obj.__params = kwargs
         return obj
 
+    def __init_subclass__(cls, **kwargs):
+        # TODO: check if names can all be resolved (for get_requested_params).
+        pass
+
     @property
     def name(self):
         return self.__class__.__name__
@@ -29,11 +33,13 @@ class Component(object):
         # TODO: Implement
         pass
 
-    # @classmethod
-    # def set_requested_params(cls, params):
-    #     """ Sets the __init__ parameters with the ones provided in `params`. """
-    #     # TODO: Implement
-    #     pass
+    @classmethod
+    def resolve(cls, **params):
+        """
+        Resolves the components and subcomponents recursively.
+        Uses `cls.get_provided_parameters` first to set default values, then overrides with provided **params.
+        """
+        pass
 
     def get_params(self):
         """ Returns a dictionary of the parameters and their values that were supplied through __init__. """
@@ -42,9 +48,11 @@ class Component(object):
 
 
 class ComponentResolver(ABC):
+
     @classmethod
     @abstractmethod
     def get_provided_parameters(cls):
+        """ Returns provided parameters as a dict. Type changes should have been taken care of. """
         pass
 
 
