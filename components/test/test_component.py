@@ -594,7 +594,6 @@ def test_component_override_parent():
         Comp.resolve(par2=42)
 
 
-@pytest.mark.xfail
 def test_component_override_subcomponent_type():
     class OtherComp(Component):
         def __init__(self, par2=5):
@@ -615,29 +614,16 @@ def test_component_override_subcomponent_type():
         def __init__(self, sub: SubComp):
             self.sub = sub
 
-    # TODO: test
-    assert False
-
-    # c = Comp.resolve()
-    # assert c.get_params()['sub'].get_params() == {'par2': 5}
-    # assert type(c.sub) == OtherComp
-    # c = Comp.resolve(par2=8)
-    # assert c.get_params()['sub'].get_params() == {'par2': 8}
-    # assert type(c.sub) == OtherComp
-    # with pytest.raises(TypeError):
-    #     Comp.resolve(par1=42)
-    #
-    # c = Comp.resolve()
-    # assert c.get_params()['sub'].get_params() == {'par1': 3}
-    # assert type(c.sub) == SubComp
-    # c = Comp.resolve(par1=8)
-    # assert c.get_params()['sub'].get_params() == {'par1': 8}
-    # assert type(c.sub) == SubComp
-    # with pytest.raises(TypeError):
-    #     Comp.resolve(par2=42)
+    c = Comp.resolve()
+    assert type(c.sub.sub1) == OtherComp2
+    c = Comp.resolve(par1=2)
+    assert c.sub.par1 == 2
+    with pytest.raises(TypeError):
+        Comp.resolve(par2=42)
+    c = Comp.resolve(par3=7)
+    assert c.sub.sub1.par3 == 7
 
 
-@pytest.mark.xfail
 def test_component_override_subcomponent_type_full_name():
     class OtherComp(Component):
         def __init__(self, par2=5):
@@ -658,6 +644,12 @@ def test_component_override_subcomponent_type_full_name():
         def __init__(self, sub: SubComp):
             self.sub = sub
 
-    # TODO: test
-    assert False
+    c = Comp.resolve()
+    assert type(c.sub.sub1) == OtherComp2
+    c = Comp.resolve(par1=2)
+    assert c.sub.par1 == 2
+    with pytest.raises(TypeError):
+        Comp.resolve(par2=42)
+    c = Comp.resolve(par3=7)
+    assert c.sub.sub1.par3 == 7
 
