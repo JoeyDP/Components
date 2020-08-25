@@ -3,7 +3,6 @@ import pytest
 from components import Component
 
 
-
 def test_subcomponent_shadowed_param_name():
     class SubComp(Component):
         def __init__(self, key=5):
@@ -66,19 +65,3 @@ def test_subcomponent_impossible_param_name():
         Comp.get_requested_params()
 
 
-# def test_type_override_correct_params():
-#     class SubComp(Component):
-#         def __init__(self, par1=3):
-#             self.par1 = par1
-#
-#     class OtherComp(Component):
-#         def __init__(self, par2=5):
-#             self.par2 = par2
-#
-#     class Comp(Component):
-#         sub: OtherComp
-#
-#         def __init__(self, sub: SubComp):
-#             self.sub = sub
-#
-#     params = Comp.get_requested_params()

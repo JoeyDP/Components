@@ -54,6 +54,9 @@ class ComponentParam(Param):
         else:
             self.params = params
 
+    def __repr__(self):
+        return f"ComponentParam: {self.full_name}"
+
     def enforce_consistency(self):
         # 1. remove all shadowed variable names
         self.remove_shadowed()

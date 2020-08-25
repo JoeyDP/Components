@@ -108,8 +108,6 @@ class Component(object):
                         f"Type for parameter {param.full_name} supplied multiple times: {key}")
                 key = list(key)[0]
                 param.type = provided_types.pop(key)
-                print(f"change type of {param.full_name} to {param.type}")
-                print(provided_types)
 
                 # if component type changed, refresh hierarchy
                 if old_type is not None and issubclass(old_type, Component) or issubclass(param.type, Component):
