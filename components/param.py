@@ -1,13 +1,16 @@
 
 
 class Param(object):
-    def __init__(self, name, tpe, default):
+    def __init__(self, name, tpe, default, aliases=None):
         # original name of the parameter
         self.name = name
         self.type = tpe
         self.default = default
-        # aliases need to be unique within the component hierarchy
-        self.aliases = {name}
+        # aliases need to be unique within the component hierarchy. ComponentParam.enforce_consistency() checks this.
+        if aliases is None:
+            self.aliases = {self.name}
+        else:
+            self.aliases = set(aliases)
 
     @property
     def minimal_name(self):
@@ -19,10 +22,6 @@ class Param(object):
         """ Fully defined name in component hierarchy. """
         return max(self.aliases, key=len)
 
-    def add_prefix(self, prefix, concat_symb='_'):
-        """ Add a variant of each alias with the given prefix (and concatenation symbol). """
-        self.aliases = self.aliases | {prefix + "_" + alias for alias in self.aliases}
-
     def _remove_shadowed(self, defined):
         self.aliases -= defined
 
@@ -31,8 +30,10 @@ class Param(object):
             if alias in name_map:
                 # name already defined
                 other_param = name_map[alias]
-                other_param.aliases.remove(alias)
+                # use discard iso remove, because it may have already been deleted from the mapped param
+                other_param.aliases.discard(alias)
                 self.aliases.remove(alias)
+                # Note: do not remove param from name_map, because conflict can occur more than 2 times
             else:
                 name_map[alias] = self
 
@@ -43,14 +44,12 @@ class Param(object):
 
 
 class ComponentParam(Param):
-    def __init__(self, name, tpe, default, params=None):
-        super().__init__(name, tpe, default)
-        self.params = params
-
-    def add_prefix(self, prefix, concat_symb='_'):
-        super().add_prefix(prefix, concat_symb=concat_symb)
-        for param in self.params:
-            param.add_prefix(prefix, concat_symb=concat_symb)
+    def __init__(self, name, tpe, default, params=None, aliases=None):
+        super().__init__(name, tpe, default, aliases=aliases)
+        if params is None:
+            self.params = list()
+        else:
+            self.params = params
 
     def enforce_consistency(self):
         # 1. remove all shadowed variable names
@@ -61,7 +60,10 @@ class ComponentParam(Param):
         self.check_valid()
 
     def remove_shadowed(self):
-        """ Remove all variable names that conflict with a parent name. """
+        """
+        Remove all variable names that conflict with a parent name.
+        Uses depth first traversal to remove parent names from children.
+        """
         self._remove_shadowed(set())
 
     def _remove_shadowed(self, defined):
@@ -75,7 +77,10 @@ class ComponentParam(Param):
                 param._remove_shadowed(defined | all_param_names)
 
     def remove_conflicting(self):
-        """ Remove all names that occur multiple times, without a parent-child relation. """
+        """
+        Remove all names that occur multiple times, without a parent-child relation.
+        Uses in-order traversal with map from names to components to detect conflicts.
+        """
         name_map = dict()
         self._remove_conflicting(name_map)
 
@@ -89,3 +94,4 @@ class ComponentParam(Param):
         super().check_valid()
         for param in self.params:
             param.check_valid()
+
