@@ -22,6 +22,9 @@ class Param(object):
         """ Fully defined name in component hierarchy. """
         return max(self.aliases, key=len)
 
+    def __repr__(self):
+        return f"Param: {self.full_name}"
+
     def _remove_shadowed(self, defined):
         self.aliases -= defined
 

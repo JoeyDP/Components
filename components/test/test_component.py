@@ -256,7 +256,6 @@ def test_subcomponent_change_type_mismatch_warn2():
         Comp.resolve(key=20)
 
 
-@pytest.mark.xfail
 def test_subcomponent_conflicting_param_type_are_conflicts_removed():
     class SubComp(Component):
         def __init__(self, key=5):

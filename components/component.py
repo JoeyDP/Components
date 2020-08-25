@@ -44,10 +44,8 @@ class Component(object):
         return f"{self.name}({', '.join(f'{key}={value}' for key, value in self.get_params().items())})"
 
     @classmethod
-    def get_requested_params(cls, prefixes=None):
-        if prefixes is None:
-            prefixes = []
-        return cls._get_requested_params(dict(), prefixes)
+    def get_requested_params(cls):
+        return cls._get_requested_params(dict(), [])
 
     @classmethod
     def _get_requested_params(cls, parent_provided_types, prefixes):
@@ -55,59 +53,73 @@ class Component(object):
         Returns a list of the requested parameters. Includes their type and default value from __init__ and
         additionally, alternative names are provided.
         """
-        provided_types = cls.get_provided_types()
-        provided_types.update(parent_provided_types)
+        # first do a pass to resolve names
+        params = cls._resolve_requested_names(prefixes)
 
-        # first do a pass to resolve types
+        # check consistency
+        current_component_param = ComponentParam("__main__", cls, None, params=params)
+        current_component_param.enforce_consistency()
+
+        # Then do a pass to resolve types
+        params = cls._update_requested_types(params, parent_provided_types, prefixes)
+        return params
+
+    @classmethod
+    def _resolve_requested_names(cls, prefixes):
         requested = list()
-
         param_iter = iter(inspect.signature(cls.__init__).parameters.items())
         next(param_iter)  # skip self
         for parname, param in param_iter:
             tpe = param.annotation
             default = param.default
 
+            if tpe == inspect.Parameter.empty:
+                if default != inspect.Parameter.empty:
+                    tpe = type(default)
+                else:
+                    tpe = None
+
             aliases = {param.name}
             for prefix in reversed(prefixes):
                 aliases = aliases | {prefix + '_' + alias for alias in aliases}
 
-            # Change type based on type hint in annotation
-            if provided_types.keys() & aliases:
-                key = aliases & provided_types.keys()
-                if len(key) > 1:
-                    raise TypeError(
-                        f"Type for parameter {'_'.join(prefixes + [param.name])} supplied multiple times: {key}")
-                key = list(key)[0]
-                tpe = provided_types.pop(key)
-                print(f"change type of {'_'.join(prefixes + [param.name])} to {tpe}")
-                print(provided_types)
-            else:
-                if tpe == inspect.Parameter.empty:
-                    if default != inspect.Parameter.empty:
-                        tpe = type(default)
-                    else:
-                        tpe = None
-
             if tpe is not None and issubclass(tpe, Component):
-                param = ComponentParam(parname, tpe, default, aliases=aliases)
+                sub_params = tpe._resolve_requested_names([param.name] + prefixes)
+                param = ComponentParam(parname, tpe, default, params=sub_params, aliases=aliases)
             else:
                 param = Param(parname, tpe, default, aliases)
 
             requested.append(param)
 
-        # check consistency
-        current_component_param = ComponentParam("__main__", cls, None, params=requested)
-        current_component_param.enforce_consistency()
+        return requested
 
-        for param in requested:
-            if isinstance(param, ComponentParam):
-                sub_params = param.type._get_requested_params(provided_types, [param.name] + prefixes)
-                param.params = sub_params
+    @classmethod
+    def _update_requested_types(cls, params, parent_provided_types, prefixes):
+        provided_types = cls.get_provided_types()
+        provided_types.update(parent_provided_types)
 
-        # checks and consistency
-        current_component_param.enforce_consistency()
+        for param in params:
+            # Change type based on type hint in annotation
+            if provided_types.keys() & param.aliases:
+                old_type = param.type
+                key = param.aliases & provided_types.keys()
+                if len(key) > 1:
+                    raise TypeError(
+                        f"Type for parameter {param.full_name} supplied multiple times: {key}")
+                key = list(key)[0]
+                param.type = provided_types.pop(key)
+                print(f"change type of {param.full_name} to {param.type}")
+                print(provided_types)
 
-        return current_component_param.params
+                # if component type changed, refresh hierarchy
+                if old_type is not None and issubclass(old_type, Component) or issubclass(param.type, Component):
+                    sub_params = param.type._get_requested_params(provided_types, [param.name] + prefixes)
+                    param.params = sub_params
+                    # param = ComponentParam(parname, tpe, default, params=sub_params, aliases=aliases)
+            elif isinstance(param, ComponentParam):
+                param.type._update_requested_types(param.params, provided_types, [param.name] + prefixes)
+
+        return params
 
     @classmethod
     def get_provided_parameters(cls):
