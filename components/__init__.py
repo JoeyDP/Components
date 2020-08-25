@@ -1,1 +1,1 @@
-from components.component import Component, ComponentResolver
+from components.component import Component

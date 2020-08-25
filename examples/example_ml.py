@@ -41,6 +41,8 @@ class CrossValidation(Component):
 
 
 class Experiment(Component):
+    """ A machine learning experiment. """
+
     def __init__(self, algorithm: Algorithm, splitter: CrossValidation, datasource: DataSource):
         """ Components for the experiment are supplied. """
         self.algorithm = algorithm
@@ -56,7 +58,7 @@ class Experiment(Component):
 
 
 class ExperimentVariant(Experiment):
-    """ Define a different setting of the experiment by overriding parameters or even components """
+    """ A variant of the experiment by overriding parameters and even components. """
 
     # change the algorithm to Algorithm2
     algorithm: Algorithm2

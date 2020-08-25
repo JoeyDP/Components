@@ -43,7 +43,10 @@ class CrossValidation(Component):
 
 cli = CLI()
 
+
 class Experiment(Component, cli.Command):
+    """ A machine learning experiment. """
+
     def __init__(self, algorithm: Algorithm, splitter: CrossValidation, datasource: DataSource):
         """ Components for the experiment are supplied. """
         self.algorithm = algorithm
@@ -59,7 +62,7 @@ class Experiment(Component, cli.Command):
 
 
 class ExperimentVariant(Experiment, cli.Command):
-    """ Define a different setting of the experiment by overriding parameters or even components """
+    """ A variant of the experiment by overriding parameters and even components. """
 
     # change the algorithm to Algorithm2
     algorithm: Algorithm2
@@ -68,8 +71,6 @@ class ExperimentVariant(Experiment, cli.Command):
     par1 = 0.2
     ratio = 0.7
 
-
-cli.run()
 
 """
 Try these commands:
@@ -90,4 +91,5 @@ Amount positive: 6
 Amount positive: 5
 
 """
-
+if __name__ == "__main__":
+    cli()

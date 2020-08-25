@@ -426,10 +426,8 @@ def test_attribute_override_conflict():
         def __init__(self, sub: SubComp):
             self.sub = sub
 
-    c = Comp.resolve(key=4)
-    assert c.get_params()['sub'].get_params() == {'key': 4}
-    assert c.sub.key == 4
-    assert type(c.sub) == SubComp
+    with pytest.raises(TypeError):
+        Comp.resolve(key=4)
     c = SubComp()
     assert c.get_params() == {'key': 5}
     assert c.key == 5

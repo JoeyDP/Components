@@ -44,13 +44,22 @@ class Component(object):
         return f"{self.name}({', '.join(f'{key}={value}' for key, value in self.get_params().items())})"
 
     @classmethod
-    def get_requested_params(cls):
-        return cls._get_requested_params(dict(), [])
+    def get_requested_params(cls, flatten=False):
+        """
+        Returns a list of parameters for this component.
+        Component parameters are hierarchical and contain parameters of subcomponents.
+        Each param includes its type, default value from __init__ and alternative names.
+        """
+        current_component_param = cls._get_requested_params(dict(), dict(), [])
+        if flatten:
+            return current_component_param.flatten()
+        return current_component_param.params
 
     @classmethod
-    def _get_requested_params(cls, parent_provided_types, prefixes):
+    def _get_requested_params(cls, parent_provided_types, parent_provided_params, prefixes):
         """
-        Returns a list of the requested parameters. Includes their type and default value from __init__ and
+        Returns a ComponentParam of this component.
+        This hierarchical structure includes their type and default value from __init__ or get_provided_params and
         additionally, alternative names are provided.
         """
         # first do a pass to resolve names
@@ -61,8 +70,9 @@ class Component(object):
         current_component_param.enforce_consistency()
 
         # Then do a pass to resolve types
-        params = cls._update_requested_types(params, parent_provided_types, prefixes)
-        return params
+        current_component_param.params = cls._update_requested_types(params, parent_provided_types,
+                                                                     parent_provided_params, prefixes)
+        return current_component_param
 
     @classmethod
     def _resolve_requested_names(cls, prefixes):
@@ -73,12 +83,14 @@ class Component(object):
             tpe = param.annotation
             default = param.default
 
+            # if no type provided, try to derive it from original default value
             if tpe == inspect.Parameter.empty:
-                if default != inspect.Parameter.empty:
+                if default != inspect.Parameter.empty and default is not None:
                     tpe = type(default)
                 else:
                     tpe = None
 
+            # compute aliases of param
             aliases = {param.name}
             for prefix in reversed(prefixes):
                 aliases = aliases | {prefix + '_' + alias for alias in aliases}
@@ -94,12 +106,24 @@ class Component(object):
         return requested
 
     @classmethod
-    def _update_requested_types(cls, params, parent_provided_types, prefixes):
+    def _update_requested_types(cls, params, parent_provided_types, parent_provided_params, prefixes):
         provided_types = cls.get_provided_types()
         provided_types.update(parent_provided_types)
 
+        provided_params = cls.get_provided_parameters()
+        provided_params.update(parent_provided_params)
+
         for param in params:
             # Change type based on type hint in annotation
+            # set default value to provided parameter
+            if param.aliases & provided_params.keys():
+                key = param.aliases & provided_params.keys()
+                if len(key) > 1:
+                    raise TypeError(
+                        f"Attribute override for parameter {param.full_name} supplied multiple times: {key}")
+                key = list(key)[0]
+                param.default = provided_params.pop(key)
+
             if provided_types.keys() & param.aliases:
                 old_type = param.type
                 key = param.aliases & provided_types.keys()
@@ -111,28 +135,30 @@ class Component(object):
 
                 # if component type changed, refresh hierarchy
                 if old_type is not None and issubclass(old_type, Component) or issubclass(param.type, Component):
-                    sub_params = param.type._get_requested_params(provided_types, [param.name] + prefixes)
+                    sub_params = param.type._get_requested_params(provided_types, provided_params, [param.name] + prefixes).params
                     param.params = sub_params
-                    # param = ComponentParam(parname, tpe, default, params=sub_params, aliases=aliases)
             elif isinstance(param, ComponentParam):
-                param.type._update_requested_types(param.params, provided_types, [param.name] + prefixes)
+                param.type._update_requested_types(param.params, provided_types, provided_params, [param.name] + prefixes)
 
         return params
 
     @classmethod
     def get_provided_parameters(cls):
-        """ Returns provided parameters as a dict. Type changes should have been taken care of.
+        """ Returns provided parameters as a dict.
         """
         attributes = {name: var for name, var in vars(cls).items() if not name.startswith('__')}
         return attributes
 
     @classmethod
     def get_provided_types(cls):
-        """ Returns provided parameters as a dict.
+        """ Returns provided parameter types as a dict.
         """
         if hasattr(cls, '__annotations__'):
             return cls.__annotations__.copy()
         return dict()
+
+    def resolve_provided_params(self, requested_params):
+        pass
 
     @classmethod
     def resolve(cls, **params):
@@ -156,58 +182,45 @@ class Component(object):
         Uses `provided_params` first to set default values, then overrides with params.
         Need to pop from params to check if they were all used.
         """
-        # TODO: Add warning for class attributes that were unused? (might indicate name change or typo)
         provided_params = cls.get_provided_parameters()
         provided_params.update(parent_provided_params)
         kwargs = dict()
-        for param in requested_params:
+        for requested_param in requested_params:
             found = False
             value = None
-            # first try to find it in the user params
-            if param.aliases & params.keys():
+            # Try to find it in the user params
+            if requested_param.aliases & params.keys():
                 found = True
-                key = param.aliases & params.keys()
+                key = requested_param.aliases & params.keys()
                 if len(key) > 1:
-                    raise TypeError(f"Value for parameter {param.full_name} supplied multiple times: {key}")
+                    raise TypeError(f"Value for parameter {requested_param.full_name} supplied multiple times: {key}")
                 key = list(key)[0]
                 value = params.pop(key)
-            # then try to find it in the attribute provided params
-            elif param.aliases & provided_params.keys():
-                found = True
-                key = param.aliases & provided_params.keys()
-                if len(key) > 1:
-                    raise TypeError(f"Attribute override for parameter {param.full_name} supplied multiple times: {key}")
-                key = list(key)[0]
-                value = provided_params.pop(key)
-            # finally in the case of a component: see if the type is a component and try to resolve it.
-            elif param.type is not None and issubclass(param.type, Component):
+            # In the case of a component: see if the type is a component and try to resolve it.
+            elif requested_param.type is not None and issubclass(requested_param.type, Component):
                 # param is of type ComponentParam
                 found = True
-                value = param.type._resolve(params, provided_params, param.params)
-            elif param.default is not inspect.Parameter.empty:
-                # no worries, there is a default
+                value = requested_param.type._resolve(params, provided_params, requested_param.params)
+            # No parameter found? No worries, there is a default
+            elif requested_param.default is not inspect.Parameter.empty:
                 found = True
-                value = param.default
+                value = requested_param.default
 
             if found:
-                if param.type is not None and not isinstance(value, param.type):
-                    warnings.warn(f"Parameter '{param.full_name}' expected type {param.type}, but got {type(value)} instead",
-                                  RuntimeWarning)
-                kwargs[param.name] = value
+                if requested_param.type is not None and not isinstance(value, requested_param.type):
+                    warnings.warn(
+                        f"Parameter '{requested_param.full_name}' expected type {requested_param.type}, but got {type(value)} instead",
+                        RuntimeWarning)
+                kwargs[requested_param.name] = value
             else:
                 # no default and no provided parameter: can't instantiate component.
                 #  error will be raised when trying to instantiate.
-                warnings.warn(f"Missing parameter for resolve: {param.name}", RuntimeWarning)
+                warnings.warn(f"Missing parameter for resolve: {requested_param.name}", RuntimeWarning)
         return cls(**kwargs)
 
     def get_params(self):
         """ Returns a dictionary of the parameters and their values that were supplied through __init__. """
         return self.__params
 
-
-class ComponentResolver(ABC):
-    @classmethod
-    @abstractmethod
-    def get_provided_parameters(cls):
-        """ Returns provided parameters as a dict. Type changes should have been taken care of. """
-        pass
+# TODO: Add decorator for explicit parameters overrides.
+#       This makes it possible to provide a warning for class attributes that were unused (might indicate name change or typo)

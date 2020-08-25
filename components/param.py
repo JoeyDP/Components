@@ -45,6 +45,10 @@ class Param(object):
         if len(self.aliases) == 0:
             raise AttributeError(f"No valid identifier for parameter {self.name}")
 
+    def flatten(self):
+        """ Return flattened version of params, without components. """
+        return [self]
+
 
 class ComponentParam(Param):
     def __init__(self, name, tpe, default, params=None, aliases=None):
@@ -100,4 +104,9 @@ class ComponentParam(Param):
         super().check_valid()
         for param in self.params:
             param.check_valid()
+
+    def flatten(self):
+        """ Return flattened version of params, without components. """
+        return sum(map(lambda x: x.flatten(), self.params), [])
+
 
