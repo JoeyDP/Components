@@ -8,13 +8,6 @@ from components import Component
 class MyHelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
     """ Custom help formatter for argparse. """
 
-    def _get_help_string(self, action):
-        print("action", action)
-        print("type", action.type)
-        if isinstance(action, argparse._StoreTrueAction) or isinstance(action, argparse._StoreFalseAction):
-            return action.help
-        return super()._get_help_string(action)
-
     def _get_default_metavar_for_optional(self, action):
         if action.type is None:
             return ""
@@ -91,20 +84,31 @@ class CLI:
             if default is not None:
                 group.set_defaults(**{dest: default})
 
-        for param in cls.get_requested_params(flatten=True):
-            param_name = param.name[1:] if param.name[0] == "_" else param.minimal_name
+        def format_name(name):
+            param_name = name[1:] if name[0] == "_" else name
             param_name = param_name.replace('_', '-')
             prefix = "-" if len(param_name) == 1 else "--"
-            required = param.default is inspect.Parameter.empty
+            return prefix + param_name
 
+        required_arguments = sub_parser.add_argument_group('required arguments')
+        for param in cls.get_requested_params(flatten=True):
+            required = param.default is inspect.Parameter.empty
+            names = [format_name(alias) for alias in sorted(param.aliases, key=len)]
             if param.type == bool:
-                add_bool_param(param_name, param.full_name, None if required else param.default)
+                add_bool_param(*names, param.full_name, None if required else param.default)
             else:
-                print(param.type)
-                sub_parser.add_argument(prefix + param_name, type=param.type, default=param.default,
-                                        help=" ",
-                                        dest=param.full_name,
-                                        required=required)
+                conditional_kwargs = dict()
+                if required:
+                    p = required_arguments
+                else:
+                    p = sub_parser
+                    conditional_kwargs['default'] = param.default
+                    conditional_kwargs['help'] = "(default: %(default)s)"
+                p.add_argument(*names,
+                               type=param.type,
+                               dest=param.full_name,
+                               required=required,
+                               **conditional_kwargs)
 
     def parse_args(self):
         cmd_args = self.parser.parse_args()
