@@ -1,7 +1,7 @@
 # Components
 Python library to facilitate modular components that can be combined through dependency injection.
 
-# Example
+## Getting Started
 Define your components by subclassing from `Component`. Then you can use them in other components through dependency injection as follows:
 ```python
 from components import Component
@@ -77,7 +77,7 @@ log path: logs/logfile.txt
 log rotations: 5
 ```
 
-Finally, it is also possible to turn Components into commands for a command line interface (CLI).
+Finally, it is also possible to turn Components into commands for a command line interface (CLI). Simply create a `cli = components.cli.CLI()` object and have your `Component` extend from `cli.Command`. Then the command will be registered and its `run` function will be called when the command is used from the command line.
 ```python
 from components.cli import CLI
 cli = CLI()
@@ -117,3 +117,14 @@ optional arguments:
   --parameter1 int      (default: 42)
 
 ```
+
+## Technical Details
+WIP
+ - Explain semantics of conflicting param names
+ - Explain that creating an object without `resolve` does not take attributes into account
+ - ...
+
+## Future Work
+ - Add `@argument` annotation to indicate class attributes that are arguments for parameters (allows to detect mistyped names for example).
+ - Add support for lists in command line.
+ - Suggestions? Contact [me](mailto:joeydepauw@gmail.com)!
