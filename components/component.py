@@ -99,7 +99,10 @@ class Component(object):
                     tpe = None
 
             # if type is Tuple[], treat as tuple of parameters
-            if getattr(tpe, "__origin__", None) == tuple:
+            print(tpe)
+            if getattr(tpe, "__origin__", None) == tuple or getattr(tpe, "__origin__", None) == typing.Tuple:
+                # check against typing.Tuple (Python3.6) and tuple (Python 3.7 onward)
+                print("tpe is Tuple")
                 tpe = ComponentList(tpe.__args__)
                 if default == inspect.Parameter.empty:
                     default = list()
@@ -149,7 +152,7 @@ class Component(object):
                 new_type = provided_types.pop(key)
 
                 # if type is Tuple[], treat as tuple of parameters
-                if getattr(new_type, "__origin__", None) == tuple:
+                if getattr(new_type, "__origin__", None) == tuple or getattr(new_type, "__origin__", None) == typing.Tuple:
                     new_type = ComponentList(new_type.__args__)
 
                 param.type = new_type
@@ -276,7 +279,7 @@ class _ComponentList(Component):
                 return []
 
             # if type is Tuple[], treat as list
-            if getattr(tpe, "__origin__", None) == typing.Tuple:
+            if getattr(tpe, "__origin__", None) == tuple or getattr(tpe, "__origin__", None) == typing.Tuple:
                 tpe = ComponentList(tpe.__args__)
 
             name = str(index)

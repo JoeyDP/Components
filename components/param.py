@@ -15,6 +15,8 @@ class Param(object):
     @property
     def minimal_name(self):
         """ Shortest name that still uniquely identifies the parameter. """
+        if len(self.aliases) == 0:
+            return self.name
         return min(self.aliases, key=len)
 
     @property

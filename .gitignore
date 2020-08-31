@@ -131,3 +131,5 @@ dmypy.json
 # Jetbrains IDE
 .idea/
 
+env*/
+
