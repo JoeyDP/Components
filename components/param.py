@@ -20,15 +20,18 @@ class Param(object):
     @property
     def full_name(self):
         """ Fully defined name in component hierarchy. """
+        if len(self.aliases) == 0:
+            return self.name
         return max(self.aliases, key=len)
 
     def __repr__(self):
         return f"Param: {self.full_name}"
 
-    def _remove_shadowed(self, defined):
-        self.aliases -= defined
+    def remove_invalid_aliases(self):
+        str_numbers = set(map(str, range(10)))
+        self.aliases = {alias for alias in self.aliases if not alias[0] in str_numbers}
 
-    def _remove_conflicting(self, name_map):
+    def _remove_conflicting_aliases(self, name_map):
         for alias in list(self.aliases):
             if alias in name_map:
                 # name already defined
@@ -62,42 +65,50 @@ class ComponentParam(Param):
         return f"ComponentParam: {self.full_name}"
 
     def enforce_consistency(self):
-        # 1. remove all shadowed variable names
-        self.remove_shadowed()
-        # 2. resolve all conflicting names
-        self.remove_conflicting()
-        # 3. if param without valid identifier, raise error
+        # 1. remove aliases that aren't valid identifiers.
+        self.remove_invalid_aliases()
+        # 2. remove all shadowed variable names
+        self.remove_shadowed_aliases()
+        # 3. resolve all conflicting names
+        self.remove_conflicting_aliases()
+        # 4. if param without valid identifier, raise error
         self.check_valid()
 
-    def remove_shadowed(self):
+    def remove_invalid_aliases(self):
+        """ Remove aliases that aren't valid identifiers. """
+        super().remove_invalid_aliases()
+        for param in self.params:
+            param.remove_invalid_aliases()
+
+    def remove_shadowed_aliases(self):
         """
         Remove all variable names that conflict with a parent name.
         Uses depth first traversal to remove parent names from children.
         """
-        self._remove_shadowed(set())
+        self._remove_shadowed_aliases(set())
 
-    def _remove_shadowed(self, defined):
+    def _remove_shadowed_aliases(self, defined):
         all_param_names = self.aliases.copy()
         for param in self.params:
             all_param_names |= param.aliases
 
         for param in self.params:
-            param._remove_shadowed(defined)
+            param.aliases -= defined  # prune aliases as well
             if isinstance(param, ComponentParam):
-                param._remove_shadowed(defined | all_param_names)
+                param._remove_shadowed_aliases(defined | all_param_names)
 
-    def remove_conflicting(self):
+    def remove_conflicting_aliases(self):
         """
         Remove all names that occur multiple times, without a parent-child relation.
         Uses in-order traversal with map from names to components to detect conflicts.
         """
         name_map = dict()
-        self._remove_conflicting(name_map)
+        self._remove_conflicting_aliases(name_map)
 
-    def _remove_conflicting(self, name_map):
-        super()._remove_conflicting(name_map)
+    def _remove_conflicting_aliases(self, name_map):
+        super()._remove_conflicting_aliases(name_map)
         for param in self.params:
-            param._remove_conflicting(name_map)
+            param._remove_conflicting_aliases(name_map)
 
     def check_valid(self):
         """ Check if every parameter still has at least one name. """

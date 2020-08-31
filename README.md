@@ -118,6 +118,37 @@ optional arguments:
 
 ```
 
+
+## Advanced Usage
+
+In addition to providing single `Components`, the resolver will also instantiate lists of `Components` when requested with the `Tuple` type hint. This can be useful for supplying a variable amount of `Components` for example, for the `Listener` pattern.
+
+This example illustrates the usage of `Tuple` with `Components`.
+
+```python
+from typing import Tuple
+
+class SubComp1(Component):
+    def __init__(self, par=42, par1: int=3):
+        self.par = par
+        self.par1 = par1
+
+class SubComp2(Component):
+    def __init__(self, par=9, par2: str="Test"):
+        self.par = par
+        self.par2 = par2
+
+class Comp(Component):
+    def __init__(self, components: Tuple[Component, ...]):
+        self.components = components
+
+class ParentComp(Comp):
+    components: Tuple[SubComp1, SubComp2]
+```
+
+`Comp.resolve()` will result in an empty list for the `components` variable, whereas calling `ParentComp.resolve()` will provide a list with two components of the following types: `[SubComp1, SubComp2]` to be filled into the `components` parameter.
+
+
 ## Technical Details
 WIP
  - Explain semantics of conflicting param names

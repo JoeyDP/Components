@@ -1,6 +1,6 @@
 import inspect
 import warnings
-from abc import ABC, abstractmethod
+import typing
 
 from components.param import Param, ComponentParam
 
@@ -32,6 +32,9 @@ class Component(object):
                 obj.__params[param.name] = param.default
 
         return obj
+
+    # def __init__(self):
+    #     pass
 
     @property
     def name(self):
@@ -77,6 +80,11 @@ class Component(object):
     @classmethod
     def _resolve_requested_names(cls, prefixes):
         requested = list()
+
+        # Skip auto generated init (contains "args")
+        if cls.__init__ == object.__init__:
+            return list()
+
         param_iter = iter(inspect.signature(cls.__init__).parameters.items())
         next(param_iter)  # skip self
         for parname, param in param_iter:
@@ -90,13 +98,20 @@ class Component(object):
                 else:
                     tpe = None
 
+            # if type is Tuple[], treat as tuple of parameters
+            if getattr(tpe, "__origin__", None) == tuple:
+                tpe = ComponentList(tpe.__args__)
+                if default == inspect.Parameter.empty:
+                    default = list()
+
             # compute aliases of param
             aliases = {param.name}
             for prefix in reversed(prefixes):
                 aliases = aliases | {prefix + '_' + alias for alias in aliases}
 
-            if tpe is not None and issubclass(tpe, Component):
-                sub_params = tpe._resolve_requested_names([param.name] + prefixes)
+            tpe_is_comp = type(tpe) == type and issubclass(tpe, Component)
+            if tpe_is_comp:
+                sub_params = tpe._resolve_requested_names(prefixes + [param.name])
                 param = ComponentParam(parname, tpe, default, params=sub_params, aliases=aliases)
             else:
                 param = Param(parname, tpe, default, aliases)
@@ -114,7 +129,6 @@ class Component(object):
         provided_params.update(parent_provided_params)
 
         for param in params:
-            # Change type based on type hint in annotation
             # set default value to provided parameter
             if param.aliases & provided_params.keys():
                 key = param.aliases & provided_params.keys()
@@ -124,6 +138,7 @@ class Component(object):
                 key = list(key)[0]
                 param.default = provided_params.pop(key)
 
+            # Change type based on type hint in annotation
             if provided_types.keys() & param.aliases:
                 old_type = param.type
                 key = param.aliases & provided_types.keys()
@@ -131,14 +146,27 @@ class Component(object):
                     raise TypeError(
                         f"Type for parameter {param.full_name} supplied multiple times: {key}")
                 key = list(key)[0]
-                param.type = provided_types.pop(key)
+                new_type = provided_types.pop(key)
+
+                # if type is Tuple[], treat as tuple of parameters
+                if getattr(new_type, "__origin__", None) == tuple:
+                    new_type = ComponentList(new_type.__args__)
+
+                param.type = new_type
+
+                old_is_comp = old_type is not None and type(old_type) == type and issubclass(old_type, Component)
+                new_is_comp = type(param.type) == type and issubclass(param.type, Component)
+                if old_is_comp != new_is_comp:
+                    raise TypeError(f"Tried to change type {old_type} into {param.type}, which isn't allowed.")
 
                 # if component type changed, refresh hierarchy
-                if old_type is not None and issubclass(old_type, Component) or issubclass(param.type, Component):
-                    sub_params = param.type._get_requested_params(provided_types, provided_params, [param.name] + prefixes).params
+                if new_is_comp:
+                    sub_params = param.type._get_requested_params(provided_types, provided_params,
+                                                                 prefixes + [param.name]).params
                     param.params = sub_params
             elif isinstance(param, ComponentParam):
-                param.type._update_requested_types(param.params, provided_types, provided_params, [param.name] + prefixes)
+                param.type._update_requested_types(param.params, provided_types, provided_params,
+                                                   prefixes + [param.name])
 
         return params
 
@@ -197,7 +225,7 @@ class Component(object):
                 key = list(key)[0]
                 value = params.pop(key)
             # In the case of a component: see if the type is a component and try to resolve it.
-            elif requested_param.type is not None and issubclass(requested_param.type, Component):
+            elif requested_param.type is not None and type(requested_param.type) == type and issubclass(requested_param.type, Component):
                 # param is of type ComponentParam
                 found = True
                 value = requested_param.type._resolve(params, provided_params, requested_param.params)
@@ -207,10 +235,11 @@ class Component(object):
                 value = requested_param.default
 
             if found:
-                if requested_param.type is not None and not isinstance(value, requested_param.type):
-                    warnings.warn(
-                        f"Parameter '{requested_param.full_name}' expected type {requested_param.type}, but got {type(value)} instead",
-                        RuntimeWarning)
+                if requested_param.type is not None and type(requested_param.type) == type and not issubclass(requested_param.type, _ComponentList):
+                    if not isinstance(value, requested_param.type):
+                        warnings.warn(
+                            f"Parameter '{requested_param.full_name}' expected type {requested_param.type}, but got {type(value)} instead",
+                            RuntimeWarning)
                 kwargs[requested_param.name] = value
             else:
                 # no default and no provided parameter: can't instantiate component.
@@ -221,6 +250,59 @@ class Component(object):
     def get_params(self):
         """ Returns a dictionary of the parameters and their values that were supplied through __init__. """
         return self.__params
+
+
+class _ComponentList(Component):
+    """ Helper class to parse Tuple[Component, ...] type params. Don't use this directly. """
+    comp_types = None       # needs to be supplied by subclass
+
+    def __new__(cls, *args, **kwargs):
+        """ Hack to change creation type of this class back to tuple """
+        comps = [None] * len(kwargs)
+        for index, comp in kwargs.items():
+            comps[int(index)] = comp
+        return tuple(comps)
+
+    @classmethod
+    def _resolve_requested_names(cls, prefixes):
+        requested = list()
+        for index, tpe in enumerate(cls.comp_types):
+            if tpe == Component:
+                # Filter out base Component type
+                continue
+
+            if tpe == Ellipsis:
+                # Variadic type given, means don't fill in components
+                return []
+
+            # if type is Tuple[], treat as list
+            if getattr(tpe, "__origin__", None) == typing.Tuple:
+                tpe = ComponentList(tpe.__args__)
+
+            name = str(index)
+            # compute aliases of param
+            aliases = {name}
+            for prefix in reversed(prefixes):
+                aliases = aliases | {prefix + '_' + alias for alias in aliases}
+
+            if tpe is not None and issubclass(tpe, Component):
+                sub_params = tpe._resolve_requested_names(prefixes + [name])
+                param = ComponentParam(name, tpe, inspect.Parameter.empty, params=sub_params, aliases=aliases)
+            else:
+                param = Param(name, tpe, inspect.Parameter.empty, aliases)
+
+            requested.append(param)
+
+        return requested
+
+
+def ComponentList(component_types):
+    """ Helper class to parse Tuple[Component, ...] type params. Don't use this directly. """
+    class C(_ComponentList):
+        comp_types = component_types
+
+    return C
+
 
 # TODO: Add decorator for explicit parameters overrides.
 #       This makes it possible to provide a warning for class attributes that were unused (might indicate name change or typo)

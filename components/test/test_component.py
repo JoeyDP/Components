@@ -177,6 +177,30 @@ def test_resolve_subcomponent_conflicting_params():
     assert c.key == 10 and c.sub.key == 1
 
 
+def test_subcomponent_shadowed_param():
+    class SubComp(Component):
+        def __init__(self, key=5):
+            self.key = key
+
+    class Comp(Component):
+        def __init__(self, sub: SubComp, key=3):
+            self.sub = sub
+            self.key = key
+
+    class OtherComp(Component):
+        sub: Comp
+        def __init__(self, sub: Comp):
+            self.sub = sub
+
+    c = OtherComp.resolve()
+    assert type(c.sub) == Comp
+    assert type(c.sub.sub) == SubComp
+
+    with pytest.warns(RuntimeWarning):
+        c = OtherComp.resolve(sub=None)
+        assert(c.sub is None)
+
+
 def test_resolve_conflicting_subcomponent_params():
     class SubComp(Component):
         def __init__(self, key=5):
@@ -220,6 +244,8 @@ def test_subcomponent_type_mismatch_warn():
         Comp.resolve()
     with pytest.warns(RuntimeWarning):
         Comp.resolve(key=20)
+    with pytest.warns(None):
+        Comp.resolve(key="20")
 
 
 def test_subcomponent_change_type_mismatch_warn():
@@ -650,4 +676,105 @@ def test_component_override_subcomponent_type_full_name():
         Comp.resolve(par2=42)
     c = Comp.resolve(par3=7)
     assert c.sub.sub1.par3 == 7
+
+
+def test_parent_component_override_child_type():
+    class SubComp(Component):
+        pass
+
+    class OtherComp(Component):
+        pass
+
+    class ParentComp(Component):
+        sub: OtherComp
+
+        def __init__(self):
+            pass
+
+    class Comp(ParentComp):
+        def __init__(self, sub: SubComp):
+            super().__init__()
+            self.sub = sub
+
+    c = Comp.resolve()
+    assert type(c.sub) == OtherComp
+
+
+def test_subcomponent_cant_override_owner_type():
+    class SubComp1(Component):
+        pass
+
+    class SubComp2(Component):
+        pass
+
+    class OtherComp(Component):
+        par1 = 5
+        sub: SubComp2
+
+    class Comp(Component):
+        def __init__(self, other: OtherComp, sub: SubComp1, par1=9):
+            super().__init__()
+            self.other = other
+            self.sub = sub
+            self.par1 = par1
+
+    c = Comp.resolve()
+    assert c.par1 == 9
+    assert type(c.sub) == SubComp1
+
+
+def test_cant_change_type_of_non_component_to_component():
+    class SubComp(Component):
+        pass
+
+    class ParentComp(Component):
+        def __init__(self, par1: int):
+            self.par1 = par1
+
+    class Comp(ParentComp):
+        par1: SubComp
+
+    with pytest.raises(TypeError):
+        Comp.resolve()
+
+
+def test_resolve_component_list():
+    from typing import Tuple
+
+    class SubComp1(Component):
+        def __init__(self, par=42, par1: int=3):
+            self.par = par
+            self.par1 = par1
+
+    class SubComp2(Component):
+        def __init__(self, par=9, par2: str="Test"):
+            self.par = par
+            self.par2 = par2
+
+    class Comp(Component):
+        def __init__(self, components: Tuple[Component, ...]):
+            self.components = components
+
+    c = Comp.resolve()
+    assert len(c.components) == 0
+
+    class ParentComp(Comp):
+        components: Tuple[SubComp1, SubComp2]
+
+    c = ParentComp.resolve()
+    assert len(c.components) == 2
+    assert type(c.components[0]) == SubComp1 and c.components[0].par == 42 and c.components[0].par1 == 3
+    assert type(c.components[1]) == SubComp2 and c.components[1].par == 9 and c.components[1].par2 == "Test"
+
+    c = ParentComp.resolve(par1=5, par2="Hello", components_0_par=1, components_1_par=2)
+    assert len(c.components) == 2
+    assert type(c.components[0]) == SubComp1 and c.components[0].par == 1 and c.components[0].par1 == 5
+    assert type(c.components[1]) == SubComp2 and c.components[1].par == 2 and c.components[1].par2 == "Hello"
+
+    with pytest.raises(TypeError):
+        kwargs = {'0_par': 1}
+        ParentComp.resolve(**kwargs)
+
+    with pytest.raises(TypeError):
+        ParentComp.resolve(par=5)
 
