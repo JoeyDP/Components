@@ -85,15 +85,14 @@ class CLI:
                 group.set_defaults(**{dest: default})
 
         def format_name(name):
-            param_name = name[1:] if name[0] == "_" else name
-            param_name = param_name.replace('_', '-')
+            param_name = name.replace('_', '-')
             prefix = "-" if len(param_name) == 1 else "--"
             return prefix + param_name
 
         required_arguments = sub_parser.add_argument_group('required arguments')
         for param in cls.get_requested_params(flatten=True):
             required = param.default is inspect.Parameter.empty
-            names = [format_name(alias) for alias in sorted(param.aliases, key=len)]
+            names = [format_name(alias) for alias in sorted(param.aliases, key=len) if not (alias.startswith('_'))]
             if param.type == bool:
                 add_bool_param(*names, param.full_name, None if required else param.default)
             else:

@@ -38,13 +38,41 @@ class Component(object):
 
     @property
     def name(self):
+        """ A printable name of the component. """
         return self.__class__.__name__
+
+    @property
+    def identifier(self):
+        """ A printable name of the component that more precisely defines it.
+        Default: `self.name(self.get_params_string)`"""
+        return f"{self.name}({self.get_params_string(recursive=False)})"
+
+    @property
+    def full_identifier(self):
+        """ A printable name of the component that completely defines it.
+        Default: `self.name(self.get_params_string)`"""
+        return f"{self.name}({self.get_params_string(recursive=True)})"
+
+    def get_params_string(self, sep=", ", eq="=", recursive=True, rec_placeholder="..."):
+        """ A string representaion of the parameters. Recursive indicates whether subcomponents should be shown. """
+        params = list()
+        for k, v in self.get_params().items():
+            if k.startswith('_'):
+                continue
+            vs = repr(v)
+            if not recursive and isinstance(v, Component):
+                vs = f"{v.name}({rec_placeholder})"
+            if not recursive and isinstance(v, tuple):
+                vs = sep.join([f"{vv.name}({rec_placeholder})" for vv in v])
+                vs = f"({vs})"
+            params.append(f"{k}{eq}{vs}")
+        return sep.join(params)
 
     def __str__(self):
         return self.name
 
     def __repr__(self):
-        return f"{self.name}({', '.join(f'{key}={value}' for key, value in self.get_params().items())})"
+        return self.identifier
 
     @classmethod
     def get_requested_params(cls, flatten=False):
@@ -78,7 +106,7 @@ class Component(object):
         return current_component_param
 
     @classmethod
-    def _resolve_requested_names(cls, prefixes):
+    def _resolve_requested_names(cls, parent_aliases):
         requested = list()
 
         # Skip auto generated init (contains "args")
@@ -87,9 +115,9 @@ class Component(object):
 
         param_iter = iter(inspect.signature(cls.__init__).parameters.items())
         next(param_iter)  # skip self
-        for parname, param in param_iter:
-            tpe = param.annotation
-            default = param.default
+        for parname, iparam in param_iter:
+            tpe = iparam.annotation
+            default = iparam.default
 
             # if no type provided, try to derive it from original default value
             if tpe == inspect.Parameter.empty:
@@ -99,23 +127,26 @@ class Component(object):
                     tpe = None
 
             # if type is Tuple[], treat as tuple of parameters
-            print(tpe)
             if getattr(tpe, "__origin__", None) == tuple or getattr(tpe, "__origin__", None) == typing.Tuple:
                 # check against typing.Tuple (Python3.6) and tuple (Python 3.7 onward)
-                print("tpe is Tuple")
                 tpe = ComponentList(tpe.__args__)
                 if default == inspect.Parameter.empty:
                     default = list()
 
             # compute aliases of param
-            aliases = {param.name}
-            for prefix in reversed(prefixes):
-                aliases = aliases | {prefix + '_' + alias for alias in aliases}
+            if parname.startswith('_'):
+                # if non-identifying, only compute aliases with real name
+                aliases = {prefix + '_' + parname[1:] for prefix in parent_aliases}
+                aliases.add(parname[1:])
+                aliases.add(parname)
+            else:
+                aliases = {prefix + '_' + parname for prefix in parent_aliases}
+                aliases.add(parname)
 
             tpe_is_comp = type(tpe) == type and issubclass(tpe, Component)
             if tpe_is_comp:
-                sub_params = tpe._resolve_requested_names(prefixes + [param.name])
-                param = ComponentParam(parname, tpe, default, params=sub_params, aliases=aliases)
+                param = ComponentParam(parname, tpe, default, aliases=aliases)
+                param.params = tpe._resolve_requested_names(aliases)
             else:
                 param = Param(parname, tpe, default, aliases)
 
@@ -267,7 +298,7 @@ class _ComponentList(Component):
         return tuple(comps)
 
     @classmethod
-    def _resolve_requested_names(cls, prefixes):
+    def _resolve_requested_names(cls, parent_aliases):
         requested = list()
         for index, tpe in enumerate(cls.comp_types):
             if tpe == Component:
@@ -283,14 +314,14 @@ class _ComponentList(Component):
                 tpe = ComponentList(tpe.__args__)
 
             name = str(index)
+
             # compute aliases of param
-            aliases = {name}
-            for prefix in reversed(prefixes):
-                aliases = aliases | {prefix + '_' + alias for alias in aliases}
+            aliases = {prefix + '_' + name for prefix in parent_aliases}
+            aliases.add(name)
 
             if tpe is not None and issubclass(tpe, Component):
-                sub_params = tpe._resolve_requested_names(prefixes + [name])
-                param = ComponentParam(name, tpe, inspect.Parameter.empty, params=sub_params, aliases=aliases)
+                param = ComponentParam(name, tpe, inspect.Parameter.empty, aliases=aliases)
+                param.params = tpe._resolve_requested_names(aliases)
             else:
                 param = Param(name, tpe, inspect.Parameter.empty, aliases)
 

@@ -121,6 +121,8 @@ optional arguments:
 
 ## Advanced Usage
 
+### Lists of Components
+
 In addition to providing single `Components`, the resolver will also instantiate lists of `Components` when requested with the `Tuple` type hint. This can be useful for supplying a variable amount of `Components` for example, for the `Listener` pattern.
 
 This example illustrates the usage of `Tuple` with `Components`.
@@ -147,6 +149,12 @@ class ParentComp(Comp):
 ```
 
 `Comp.resolve()` will result in an empty list for the `components` variable, whereas calling `ParentComp.resolve()` will provide a list with two components of the following types: `[SubComp1, SubComp2]` to be filled into the `components` parameter.
+
+### Non-identifying parameters
+
+The default `__repr__` of `Components` calls the function `identifier` which shows the component name with its parameters between round braces. Additionally there is `name` and `full_identifier` to respectively only return the name or to recursively include subcomponent identifiers.
+
+However, some parameters should not be listed in the `__repr__` of an object. These can be indicated by prefixing them with an underscore (`_`) as if they were private/protected members. The parameter can then be provided using the name without underscore or with underscore.
 
 
 ## Technical Details
