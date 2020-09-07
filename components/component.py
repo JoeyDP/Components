@@ -217,9 +217,11 @@ class Component(object):
     def get_provided_types(cls):
         """ Returns provided parameter types as a dict.
         """
-        if hasattr(cls, '__annotations__'):
-            return cls.__annotations__.copy()
-        return dict()
+        types = dict()
+        for c in list(cls.__bases__) + [cls]:
+            if hasattr(c, '__annotations__'):
+                types.update(c.__annotations__)
+        return types
 
     def resolve_provided_params(self, requested_params):
         pass

@@ -730,3 +730,25 @@ def test_dont_override_param_with_function():
 
     c = Comp.resolve()
     assert c.par == 5 and c.sub.key == 42
+
+
+def test_annotations_subclass_included():
+    class SubComp(Component):
+        def __init__(self, key: int):
+            self.key = key
+
+    class Base(Component):
+        key: str
+
+    class Comp(Base):
+        test: int
+
+        def __init__(self, sub: SubComp):
+            self.sub = sub
+
+    with pytest.warns(RuntimeWarning):
+        Comp.resolve(key=3)
+
+    with pytest.warns(None) as r:
+        Comp.resolve(key="3")
+    assert len(r) == 0
