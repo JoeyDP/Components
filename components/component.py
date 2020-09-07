@@ -263,7 +263,6 @@ class Component(object):
         for requested_param in requested_params:
             found = False
             value = None
-            default_used = False
             # Try to find it in the user params
             if requested_param.aliases & params.keys():
                 found = True
@@ -281,7 +280,6 @@ class Component(object):
             # No parameter found? No worries, there is a default
             elif requested_param.default is not inspect.Parameter.empty:
                 found = True
-                default_used = True
                 value = requested_param.default
 
             if found:
@@ -289,7 +287,7 @@ class Component(object):
                         requested_param.type, _ComponentList):
                     if not isinstance(value, requested_param.type):
                         # warn for type mismatch, except for trivial cases:
-                        if (default_used and value is None) or (requested_param.type == float and type(value) == int):
+                        if (requested_param.default is None and value is None) or (requested_param.type == float and type(value) == int):
                             pass
                         else:
                             warnings.warn(
