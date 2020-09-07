@@ -143,7 +143,7 @@ class Component(object):
                 aliases = {prefix + '_' + parname for prefix in parent_aliases}
                 aliases.add(parname)
 
-            tpe_is_comp = type(tpe) == type and issubclass(tpe, Component)
+            tpe_is_comp = tpe is not None and issubclass(tpe, Component)
             if tpe_is_comp:
                 param = ComponentParam(parname, tpe, default, aliases=aliases)
                 param.params = tpe._resolve_requested_names(aliases)
@@ -189,8 +189,8 @@ class Component(object):
 
                 param.type = new_type
 
-                old_is_comp = old_type is not None and type(old_type) == type and issubclass(old_type, Component)
-                new_is_comp = type(param.type) == type and issubclass(param.type, Component)
+                old_is_comp = old_type is not None and issubclass(old_type, Component)
+                new_is_comp = issubclass(param.type, Component)
                 if old_is_comp != new_is_comp:
                     raise TypeError(f"Tried to change type {old_type} into {param.type}, which isn't allowed.")
 
@@ -261,7 +261,7 @@ class Component(object):
                 key = list(key)[0]
                 value = params.pop(key)
             # In the case of a component: see if the type is a component and try to resolve it.
-            elif requested_param.type is not None and type(requested_param.type) == type and issubclass(
+            elif requested_param.type is not None and issubclass(
                     requested_param.type, Component):
                 # param is of type ComponentParam
                 found = True
@@ -272,7 +272,7 @@ class Component(object):
                 value = requested_param.default
 
             if found:
-                if requested_param.type is not None and type(requested_param.type) == type and not issubclass(
+                if requested_param.type is not None and not issubclass(
                         requested_param.type, _ComponentList):
                     if not isinstance(value, requested_param.type):
                         warnings.warn(
