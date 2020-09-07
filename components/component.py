@@ -5,6 +5,10 @@ import typing
 from components.param import Param, ComponentParam
 
 
+# backport for typing < 3.8
+get_origin = getattr(typing, 'get_origin', lambda x: getattr(x, '__origin__', None))
+
+
 class Component(object):
     """
     A component is a part of the system. It can request parameters through its __init__ function.
@@ -128,7 +132,7 @@ class Component(object):
                     tpe = None
 
             # if type is Tuple[], treat as tuple of parameters
-            if typing.get_origin(tpe) == tuple or typing.get_origin(tpe) == typing.Tuple:
+            if get_origin(tpe) == tuple or get_origin(tpe) == typing.Tuple:
                 # check against typing.Tuple (Python3.6) and tuple (Python 3.7 onward)
                 tpe = ComponentList(tpe.__args__)
                 if default == inspect.Parameter.empty:
@@ -184,7 +188,7 @@ class Component(object):
                 new_type = provided_types.pop(key)
 
                 # if type is Tuple[], treat as tuple of parameters
-                if typing.get_origin(new_type) == tuple or typing.get_origin(new_type) == typing.Tuple:
+                if get_origin(new_type) == tuple or get_origin(new_type) == typing.Tuple:
                     new_type = ComponentList(new_type.__args__)
 
                 param.type = new_type
@@ -316,7 +320,7 @@ class _ComponentList(Component):
                 return []
 
             # if type is Tuple[], treat as list
-            if typing.get_origin(tpe) == tuple or typing.get_origin(tpe) == typing.Tuple:
+            if get_origin(tpe) == tuple or get_origin(tpe) == typing.Tuple:
                 tpe = ComponentList(tpe.__args__)
 
             name = str(index)
