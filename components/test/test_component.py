@@ -752,3 +752,43 @@ def test_annotations_subclass_included():
     with pytest.warns(None) as r:
         Comp.resolve(key="3")
     assert len(r) == 0
+
+
+def test_annotations_forward_ref_init():
+    class Comp(Component):
+        def __init__(self, sub: 'SubComp'):
+            self.sub = sub
+
+    class SubComp(Component):
+        def __init__(self, key: int = 3):
+            self.key = key
+
+    # class needs to be defined in globals.
+    # We simulate this in the function to not hinder other tests:
+    globals()['SubComp'] = SubComp
+
+    c = Comp.resolve()
+    assert type(c.sub) == SubComp
+
+
+def test_annotations_forward_ref_attribute():
+    class SubComp(Component):
+        def __init__(self, key: int = 3):
+            self.key = key
+
+    class Comp(Component):
+        sub: 'OtherComp'
+
+        def __init__(self, sub: SubComp):
+            self.sub = sub
+
+    class OtherComp(Component):
+        def __init__(self, key: int = 3):
+            self.key = key
+
+    # class needs to be defined in globals.
+    # We simulate this in the function to not hinder other tests:
+    globals()['OtherComp'] = OtherComp
+
+    c = Comp.resolve()
+    assert type(c.sub) == OtherComp

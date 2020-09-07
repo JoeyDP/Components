@@ -116,7 +116,8 @@ class Component(object):
         param_iter = iter(inspect.signature(cls.__init__).parameters.items())
         next(param_iter)  # skip self
         for parname, iparam in param_iter:
-            tpe = iparam.annotation
+            # fetch type via typing module to resolve forward refs
+            tpe = typing.get_type_hints(cls.__init__).get(parname, inspect.Parameter.empty)
             default = iparam.default
 
             # if no type provided, try to derive it from original default value
@@ -127,7 +128,7 @@ class Component(object):
                     tpe = None
 
             # if type is Tuple[], treat as tuple of parameters
-            if getattr(tpe, "__origin__", None) == tuple or getattr(tpe, "__origin__", None) == typing.Tuple:
+            if typing.get_origin(tpe) == tuple or typing.get_origin(tpe) == typing.Tuple:
                 # check against typing.Tuple (Python3.6) and tuple (Python 3.7 onward)
                 tpe = ComponentList(tpe.__args__)
                 if default == inspect.Parameter.empty:
@@ -183,8 +184,7 @@ class Component(object):
                 new_type = provided_types.pop(key)
 
                 # if type is Tuple[], treat as tuple of parameters
-                if getattr(new_type, "__origin__", None) == tuple or getattr(new_type, "__origin__",
-                                                                             None) == typing.Tuple:
+                if typing.get_origin(new_type) == tuple or typing.get_origin(new_type) == typing.Tuple:
                     new_type = ComponentList(new_type.__args__)
 
                 param.type = new_type
@@ -219,8 +219,8 @@ class Component(object):
         """
         types = dict()
         for c in list(cls.__bases__) + [cls]:
-            if hasattr(c, '__annotations__'):
-                types.update(c.__annotations__)
+            types.update(typing.get_type_hints(c))
+        print(types)
         return types
 
     def resolve_provided_params(self, requested_params):
@@ -316,7 +316,7 @@ class _ComponentList(Component):
                 return []
 
             # if type is Tuple[], treat as list
-            if getattr(tpe, "__origin__", None) == tuple or getattr(tpe, "__origin__", None) == typing.Tuple:
+            if typing.get_origin(tpe) == tuple or typing.get_origin(tpe) == typing.Tuple:
                 tpe = ComponentList(tpe.__args__)
 
             name = str(index)
