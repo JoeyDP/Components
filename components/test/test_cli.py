@@ -20,6 +20,30 @@ def test_command_is_component(cli):
                 pass
 
 
+def test_command_registered(cli):
+    class Comp(Component, cli.Command):
+        def run(self):
+            pass
+
+    assert set(cli.commands.values()) == {Comp}
+
+
+def test_command_registered_init_subclass(cli):
+    class Base(Component):
+        def __init_subclass__(cls, **kwargs):
+            super().__init_subclass__(**kwargs)
+
+    class Comp1(Base, cli.Command):
+        def run(self):
+            pass
+
+    class Comp2(cli.Command, Base):
+        def run(self):
+            pass
+
+    assert set(cli.commands.values()) == {Comp1, Comp2}
+
+
 @pytest.mark.xfail
 def test_provide_parameter(cli):
     assert False

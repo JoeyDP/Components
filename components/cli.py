@@ -47,7 +47,7 @@ class CLI:
 
             def __init_subclass__(cls, **kwargs):
                 """ Hooks the subclass as a runnable command. """
-                super().__init_subclass__()
+                super().__init_subclass__(**kwargs)
                 if not issubclass(cls, Component):
                     raise TypeError("cli.Command should only be used on Components")
                 self.commands[cls.__name__] = cls
