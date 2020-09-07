@@ -33,7 +33,7 @@ class Algorithm2(Algorithm):
 
 
 class CrossValidation(Component):
-    def __init__(self, test: list, a:int, ratio: float = 0.8):
+    def __init__(self, test: list, a: int, ratio: float = 0.8):
         self.ratio = ratio
 
     def split_data(self, data):

@@ -211,7 +211,6 @@ class Component(object):
         """
         attributes = {name: var for name, var in vars(cls).items() if
                       not (callable(var) or isinstance(var, property)) and not name.startswith('__')}
-        print(attributes)
         return attributes
 
     @classmethod

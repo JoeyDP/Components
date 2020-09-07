@@ -70,16 +70,18 @@ class CLI:
             formatter_class=MyHelpFormatter
         )
 
-        def add_bool_param(name, dest, default):
+        def add_bool_param(parser, *names, dest, default):
             """
             Add boolean parameter as two flags (--name/--no-name).
             default indicates default value or None for a required boolean parameter.
             """
             required = default is None
-            group = sub_parser.add_mutually_exclusive_group(required=required)
-            group.add_argument('--' + name, help="(default)" if default is True else "", dest=dest,
+            group = parser.add_mutually_exclusive_group(required=required)
+            group.add_argument(*names, help="(default)" if default is True else "", dest=dest,
                                action='store_true')
-            group.add_argument('--no-' + name, help="(default)" if default is False else "",
+            # strip dashes and add '--no-'
+            no_names = [f"--no-{name[2 if name[:2] == '--' else 1:]}" for name in names]
+            group.add_argument(*no_names, help="(default)" if default is False else "",
                                dest=dest, action='store_false')
             if default is not None:
                 group.set_defaults(**{dest: default})
@@ -93,14 +95,16 @@ class CLI:
         for param in cls.get_requested_params(flatten=True):
             required = param.default is inspect.Parameter.empty
             names = [format_name(alias) for alias in sorted(param.aliases, key=len) if not (alias.startswith('_'))]
+            if required:
+                p = required_arguments
+            else:
+                p = sub_parser
+
             if param.type == bool:
-                add_bool_param(*names, param.full_name, None if required else param.default)
+                add_bool_param(p, *names, dest=param.full_name, default=None if required else param.default)
             else:
                 conditional_kwargs = dict()
-                if required:
-                    p = required_arguments
-                else:
-                    p = sub_parser
+                if not required:
                     conditional_kwargs['default'] = param.default
                     conditional_kwargs['help'] = "(default: %(default)s)"
                 p.add_argument(*names,
