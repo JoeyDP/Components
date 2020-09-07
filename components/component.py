@@ -4,9 +4,9 @@ import typing
 
 from components.param import Param, ComponentParam
 
-
 # backport for typing < 3.8
 get_origin = getattr(typing, 'get_origin', lambda x: getattr(x, '__origin__', None))
+get_args = getattr(typing, 'get_args', lambda x: getattr(x, '__args__', None))
 
 
 class Component(object):
@@ -122,6 +122,12 @@ class Component(object):
         for parname, iparam in param_iter:
             # fetch type via typing module to resolve forward refs
             tpe = typing.get_type_hints(cls.__init__).get(parname, inspect.Parameter.empty)
+            print(tpe)
+            # filter out Optional[tpe] conversion performed by get_type_hints
+            if get_origin(tpe) == typing.Union:
+                args = get_args(tpe)
+                if len(args) == 2 and args[1] == None.__class__:
+                    tpe = args[0]
             default = iparam.default
 
             # if no type provided, try to derive it from original default value
@@ -148,7 +154,7 @@ class Component(object):
                 aliases = {prefix + '_' + parname for prefix in parent_aliases}
                 aliases.add(parname)
 
-            tpe_is_comp = tpe is not None and issubclass(tpe, Component)
+            tpe_is_comp = tpe is not None and isinstance(tpe, type) and issubclass(tpe, Component)
             if tpe_is_comp:
                 param = ComponentParam(parname, tpe, default, aliases=aliases)
                 param.params = tpe._resolve_requested_names(aliases)
@@ -193,7 +199,7 @@ class Component(object):
 
                 param.type = new_type
 
-                old_is_comp = old_type is not None and issubclass(old_type, Component)
+                old_is_comp = old_type is not None and isinstance(old_type, type) and issubclass(old_type, Component)
                 new_is_comp = issubclass(param.type, Component)
                 if old_is_comp != new_is_comp:
                     raise TypeError(f"Tried to change type {old_type} into {param.type}, which isn't allowed.")
@@ -258,6 +264,7 @@ class Component(object):
         for requested_param in requested_params:
             found = False
             value = None
+            default_used = False
             # Try to find it in the user params
             if requested_param.aliases & params.keys():
                 found = True
@@ -275,15 +282,20 @@ class Component(object):
             # No parameter found? No worries, there is a default
             elif requested_param.default is not inspect.Parameter.empty:
                 found = True
+                default_used = True
                 value = requested_param.default
 
             if found:
                 if requested_param.type is not None and not issubclass(
                         requested_param.type, _ComponentList):
                     if not isinstance(value, requested_param.type):
-                        warnings.warn(
-                            f"Parameter '{requested_param.full_name}' expected type {requested_param.type}, but got {type(value)} instead",
-                            RuntimeWarning)
+                        # warn for type mismatch, except for trivial cases:
+                        if (default_used and value is None) or (requested_param.type == float and type(value) == int):
+                            pass
+                        else:
+                            warnings.warn(
+                                f"Parameter '{requested_param.full_name}' expected type {requested_param.type}, but got {type(value)} instead",
+                                RuntimeWarning)
                 kwargs[requested_param.name] = value
             else:
                 # no default and no provided parameter: can't instantiate component.

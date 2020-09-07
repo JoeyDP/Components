@@ -176,8 +176,42 @@ def test_subcomponent_type_mismatch_warn():
         Comp.resolve()
     with pytest.warns(RuntimeWarning):
         Comp.resolve(key=20)
-    with pytest.warns(None):
+    with pytest.warns(None) as r:
         Comp.resolve(key="20")
+
+    assert len(r) == 0
+
+
+def test_subcomponent_type_mismatch_no_warn():
+    class SubComp(Component):
+        def __init__(self, key: float = 5):
+            self.key = key
+
+    class Comp(Component):
+        def __init__(self, sub: SubComp):
+            self.sub = sub
+
+    with pytest.warns(None) as r:
+        Comp.resolve()
+        Comp.resolve(key=20)
+    assert len(r) == 0
+
+    with pytest.warns(RuntimeWarning):
+        Comp.resolve(key="20")
+
+    with pytest.warns(RuntimeWarning):
+        Comp.resolve(sub=None)
+
+    class Comp2(Component):
+        def __init__(self, sub: SubComp = None):
+            self.sub = sub
+
+    with pytest.warns(RuntimeWarning):
+        Comp.resolve(sub=None)
+
+    with pytest.warns(None) as r:
+        Comp2.resolve()
+    assert len(r) == 0
 
 
 def test_subcomponent_change_type_mismatch_warn():
@@ -741,8 +775,29 @@ def test_annotations_subclass_included():
         key: str
 
     class Comp(Base):
-        test: int
+        def __init__(self, sub: SubComp):
+            self.sub = sub
 
+    with pytest.warns(RuntimeWarning):
+        Comp.resolve(key=3)
+
+    with pytest.warns(None) as r:
+        Comp.resolve(key="3")
+    assert len(r) == 0
+
+
+def test_annotations_subsubclass_included():
+    class SubComp(Component):
+        def __init__(self, key: int):
+            self.key = key
+
+    class BaseBase(Component):
+        key: str
+
+    class Base(BaseBase):
+        pass
+
+    class Comp(Base):
         def __init__(self, sub: SubComp):
             self.sub = sub
 
