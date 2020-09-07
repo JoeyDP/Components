@@ -122,7 +122,7 @@ class Component(object):
         for parname, iparam in param_iter:
             # fetch type via typing module to resolve forward refs
             tpe = typing.get_type_hints(cls.__init__).get(parname, inspect.Parameter.empty)
-            print(tpe)
+
             # filter out Optional[tpe] conversion performed by get_type_hints
             if get_origin(tpe) == typing.Union:
                 args = get_args(tpe)
@@ -230,7 +230,6 @@ class Component(object):
         types = dict()
         for c in list(cls.__bases__) + [cls]:
             types.update(typing.get_type_hints(c))
-        print(types)
         return types
 
     def resolve_provided_params(self, requested_params):

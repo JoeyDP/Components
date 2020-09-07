@@ -129,9 +129,6 @@ def test_init_non_identifying_params():
             self.par1 = _par1
             self.sub = _sub
 
-    for p in Comp.get_requested_params(flatten=True):
-        print(p.aliases)
-
     c = Comp(SubComp())
     assert c.par1 == 3 and c.sub.par2 == "hello"
     c = Comp.resolve()
