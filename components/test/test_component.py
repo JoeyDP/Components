@@ -120,6 +120,7 @@ def test_subcomponent_shadowed_param():
 
     class OtherComp(Component):
         sub: Comp
+
         def __init__(self, sub: Comp):
             self.sub = sub
 
@@ -129,7 +130,7 @@ def test_subcomponent_shadowed_param():
 
     with pytest.warns(RuntimeWarning):
         c = OtherComp.resolve(sub=None)
-        assert(c.sub is None)
+        assert (c.sub is None)
 
 
 def test_resolve_conflicting_subcomponent_params():
@@ -673,12 +674,12 @@ def test_resolve_component_list():
     from typing import Tuple
 
     class SubComp1(Component):
-        def __init__(self, par=42, par1: int=3):
+        def __init__(self, par=42, par1: int = 3):
             self.par = par
             self.par1 = par1
 
     class SubComp2(Component):
-        def __init__(self, par=9, par2: str="Test"):
+        def __init__(self, par=9, par2: str = "Test"):
             self.par = par
             self.par2 = par2
 
@@ -709,3 +710,23 @@ def test_resolve_component_list():
     with pytest.raises(TypeError):
         ParentComp.resolve(par=5)
 
+
+def test_dont_override_param_with_function():
+    class SubComp(Component):
+        def __init__(self, key=42):
+            self.key = key
+
+    class Comp(Component):
+        def par(self):
+            return 3
+
+        @property
+        def key(self):
+            return 9
+
+        def __init__(self, sub: SubComp, par=5):
+            self.sub = sub
+            self.par = par
+
+    c = Comp.resolve()
+    assert c.par == 5 and c.sub.key == 42

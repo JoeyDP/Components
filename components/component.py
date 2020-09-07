@@ -183,7 +183,8 @@ class Component(object):
                 new_type = provided_types.pop(key)
 
                 # if type is Tuple[], treat as tuple of parameters
-                if getattr(new_type, "__origin__", None) == tuple or getattr(new_type, "__origin__", None) == typing.Tuple:
+                if getattr(new_type, "__origin__", None) == tuple or getattr(new_type, "__origin__",
+                                                                             None) == typing.Tuple:
                     new_type = ComponentList(new_type.__args__)
 
                 param.type = new_type
@@ -196,7 +197,7 @@ class Component(object):
                 # if component type changed, refresh hierarchy
                 if new_is_comp:
                     sub_params = param.type._get_requested_params(provided_types, provided_params,
-                                                                 prefixes + [param.name]).params
+                                                                  prefixes + [param.name]).params
                     param.params = sub_params
             elif isinstance(param, ComponentParam):
                 param.type._update_requested_types(param.params, provided_types, provided_params,
@@ -208,7 +209,9 @@ class Component(object):
     def get_provided_parameters(cls):
         """ Returns provided parameters as a dict.
         """
-        attributes = {name: var for name, var in vars(cls).items() if not name.startswith('__')}
+        attributes = {name: var for name, var in vars(cls).items() if
+                      not (callable(var) or isinstance(var, property)) and not name.startswith('__')}
+        print(attributes)
         return attributes
 
     @classmethod
@@ -259,7 +262,8 @@ class Component(object):
                 key = list(key)[0]
                 value = params.pop(key)
             # In the case of a component: see if the type is a component and try to resolve it.
-            elif requested_param.type is not None and type(requested_param.type) == type and issubclass(requested_param.type, Component):
+            elif requested_param.type is not None and type(requested_param.type) == type and issubclass(
+                    requested_param.type, Component):
                 # param is of type ComponentParam
                 found = True
                 value = requested_param.type._resolve(params, provided_params, requested_param.params)
@@ -269,7 +273,8 @@ class Component(object):
                 value = requested_param.default
 
             if found:
-                if requested_param.type is not None and type(requested_param.type) == type and not issubclass(requested_param.type, _ComponentList):
+                if requested_param.type is not None and type(requested_param.type) == type and not issubclass(
+                        requested_param.type, _ComponentList):
                     if not isinstance(value, requested_param.type):
                         warnings.warn(
                             f"Parameter '{requested_param.full_name}' expected type {requested_param.type}, but got {type(value)} instead",
@@ -288,7 +293,7 @@ class Component(object):
 
 class _ComponentList(Component):
     """ Helper class to parse Tuple[Component, ...] type params. Don't use this directly. """
-    comp_types = None       # needs to be supplied by subclass
+    comp_types = None  # needs to be supplied by subclass
 
     def __new__(cls, *args, **kwargs):
         """ Hack to change creation type of this class back to tuple """
@@ -332,11 +337,11 @@ class _ComponentList(Component):
 
 def ComponentList(component_types):
     """ Helper class to parse Tuple[Component, ...] type params. Don't use this directly. """
+
     class C(_ComponentList):
         comp_types = component_types
 
     return C
-
 
 # TODO: Add decorator for explicit parameters overrides.
 #       This makes it possible to provide a warning for class attributes that were unused (might indicate name change or typo)
