@@ -219,8 +219,10 @@ class Component(object):
     def get_provided_parameters(cls):
         """ Returns provided parameters as a dict.
         """
-        attributes = {name: var for name, var in vars(cls).items() if
+        attributes = {name: getattr(cls, name) for name in dir(cls)}
+        attributes = {name: var for name, var in attributes.items() if
                       not (callable(var) or isinstance(var, property)) and not name.startswith('__')}
+        print("attributes", attributes)
         return attributes
 
     @classmethod
@@ -307,8 +309,6 @@ class Component(object):
 
 class _ComponentList(Component):
     """ Helper class to parse Tuple[Component, ...] type params. Don't use this directly. """
-    comp_types = None  # needs to be supplied by subclass
-
     def __new__(cls, *args, **kwargs):
         """ Hack to change creation type of this class back to tuple """
         comps = [None] * len(kwargs)
@@ -316,10 +316,14 @@ class _ComponentList(Component):
             comps[int(index)] = comp
         return tuple(comps)
 
+    @staticmethod
+    def comp_types():
+        raise NotImplementedError("comp_types has to be implemented by subclass")
+
     @classmethod
     def _resolve_requested_names(cls, parent_aliases):
         requested = list()
-        for index, tpe in enumerate(cls.comp_types):
+        for index, tpe in enumerate(cls.comp_types()):
             if tpe == Component:
                 # Filter out base Component type
                 continue
@@ -353,7 +357,9 @@ def ComponentList(component_types):
     """ Helper class to parse Tuple[Component, ...] type params. Don't use this directly. """
 
     class C(_ComponentList):
-        comp_types = component_types
+        @staticmethod
+        def comp_types():
+            return component_types
 
     return C
 

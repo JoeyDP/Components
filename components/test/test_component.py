@@ -666,6 +666,29 @@ def test_parent_component_override_child_type():
     assert type(c.sub) == OtherComp
 
 
+def test_parent_component_override_child_par():
+    class SubComp(Component):
+        def __init__(self, par1 = 42):
+            self.par1 = par1
+
+    class ParentComp(Component):
+        key = 5
+        par1 = 9
+
+        def __init__(self):
+            pass
+
+    class Comp(ParentComp):
+        def __init__(self, sub: SubComp, key=3):
+            super().__init__()
+            self.key = key
+            self.sub = sub
+
+    c = Comp.resolve()
+    assert c.key == 5
+    assert c.sub.par1 == 9
+
+
 def test_subcomponent_cant_override_owner_type():
     class SubComp1(Component):
         pass
