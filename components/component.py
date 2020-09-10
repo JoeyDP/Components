@@ -222,7 +222,6 @@ class Component(object):
         attributes = {name: getattr(cls, name) for name in dir(cls)}
         attributes = {name: var for name, var in attributes.items() if
                       not (callable(var) or isinstance(var, property)) and not name.startswith('__')}
-        print("attributes", attributes)
         return attributes
 
     @classmethod
